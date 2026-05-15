@@ -1,0 +1,43 @@
+{
+  "name": "session-secrets-guard",
+  "version": "0.1.0",
+  "description": "Import raw chat secrets into local storage, reuse them through aliases, and optionally scrub local resume history back to alias form.",
+  "author": {
+    "name": "dio-vibe",
+    "email": "dio.vibe.dev@gmail.com",
+    "url": "https://github.com/dio-vibe"
+  },
+  "homepage": "https://github.com/dio-vibe/session-secrets-guard",
+  "repository": "https://github.com/dio-vibe/session-secrets-guard",
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "hooks",
+    "claude",
+    "security",
+    "secrets",
+    "guardrails"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Session Secrets Guard",
+    "shortDescription": "Import chat secrets into aliases and reuse them safely",
+    "longDescription": "Adds hook handlers for Codex and Claude Code that intercept raw `[[secret]]` chat placeholders, store them in local backends such as Keychain or dotenv, generate reusable aliases, and keep later agent work anchored to those aliases instead of repeating raw values.",
+    "developerName": "dio-vibe",
+    "category": "Security",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/dio-vibe/session-secrets-guard",
+    "defaultPrompt": [
+      "Import a raw chat secret into a reusable local alias.",
+      "Resolve aliases from configured local backends such as env, dotenv, Keychain, 1Password, or Vault.",
+      "Keep raw secrets out of prompts, tool input, and tool output."
+    ],
+    "brandColor": "#0F766E",
+    "screenshots": []
+  }
+}

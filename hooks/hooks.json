@@ -1,0 +1,54 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ruby ./scripts/user_prompt_submit_guard.rb --runtime codex",
+            "timeout": 10,
+            "statusMessage": "Importing or validating secret refs"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ruby ./scripts/pre_tool_use_guard.rb --runtime codex",
+            "timeout": 10,
+            "statusMessage": "Checking tool input for secrets"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write|mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ruby ./scripts/post_tool_use_guard.rb --runtime codex",
+            "timeout": 10,
+            "statusMessage": "Checking tool output for secrets"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/ruby ./scripts/stop_session_scrub.rb --runtime codex",
+            "timeout": 10,
+            "statusMessage": "Scrubbing session history"
+          }
+        ]
+      }
+    ]
+  }
+}

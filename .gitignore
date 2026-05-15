@@ -1,0 +1,8 @@
+.DS_Store
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+hook_outputs/
+session-secrets.toml
+
