@@ -166,6 +166,32 @@ class SessionSecretsTest < Minitest::Test
     end
   end
 
+  def test_user_prompt_submit_claude_runtime_prefers_runtime_specific_block_mode
+    Dir.mktmpdir do |tmpdir|
+      config_path = Pathname.new(tmpdir).join("session-secrets.toml")
+      write_secret_config(
+        config_path,
+        defaults: {
+          "import_backend" => "dotenv",
+          "prompt_import_mode" => "allow_and_scrub",
+          "claude_prompt_import_mode" => "block",
+          "default_dotenv_path" => ".env"
+        }
+      )
+
+      response = nil
+      with_env("SESSION_SECRETS_CONFIG" => config_path.to_s) do
+        response = UserPromptSubmitGuard.handle(
+          { "prompt" => "github token #{placeholder(fake_github_secret)} 저장해" },
+          "claude"
+        )
+      end
+
+      assert_equal "block", response["decision"]
+      assert_includes response["reason"], placeholder("github_token")
+    end
+  end
+
   def test_pre_tool_use_rewrites_claude_bash_placeholders
     Dir.mktmpdir do |tmpdir|
       config_path = Pathname.new(tmpdir).join("session-secrets.toml")
@@ -335,10 +361,13 @@ class SessionSecretsTest < Minitest::Test
 
       settings = read_json(claude_home.join("settings.json"))
       command = InstallCodex.extract_first_command(settings["hooks"]["UserPromptSubmit"][0])
+      state_config = state_dir.join("session-secrets.toml").read
       refute settings["hooks"].key?("Stop")
       assert_equal "/usr/bin/ruby", results["runtime_path"]
+      assert results["state_defaults_updated"]
       assert_includes command, "user_prompt_submit_guard.rb"
       assert_equal "Bash|Edit|Write", settings["hooks"]["PreToolUse"][0]["matcher"]
+      assert_includes state_config, "claude_prompt_import_mode = \"block\""
     end
   end
 

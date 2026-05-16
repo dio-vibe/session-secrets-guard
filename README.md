@@ -219,6 +219,7 @@ That installer:
 
 - uses macOS system Ruby at `/usr/bin/ruby`
 - creates `~/.session-secrets-guard-claude/session-secrets.toml` if missing
+- sets `claude_prompt_import_mode = "block"` unless you already overrode it
 - merges absolute-path hook commands into `~/.claude/settings.json`
 
 The checked-in [`examples/claude/settings.json`](examples/claude/settings.json)

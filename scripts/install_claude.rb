@@ -13,6 +13,19 @@ module InstallClaude
 
   module_function
 
+  def ensure_claude_state_defaults(config_path)
+    config_path = Pathname.new(config_path)
+    config = SessionSecrets.load_secret_config(config_path)
+    defaults = SessionSecrets.deep_dup_hash(config.defaults)
+    aliases = SessionSecrets.deep_dup_hash(config.aliases)
+
+    return false if defaults["claude_prompt_import_mode"].to_s.strip.downcase == "block"
+
+    defaults["claude_prompt_import_mode"] = "block"
+    config_path.write(SessionSecrets.render_secret_config(defaults, aliases))
+    true
+  end
+
   def build_claude_hooks_config(repo_root, ruby_path, config_path)
     desired = InstallCodex.build_hooks_config(repo_root, ruby_path, config_path)
     hooks = JSON.parse(JSON.generate(desired["hooks"]))
@@ -86,10 +99,12 @@ module InstallClaude
     config_path = state_dir.join("session-secrets.toml")
     state_dir.mkpath
     state_created = InstallCodex.ensure_session_config(config_path, repo_root.join("session-secrets.toml.example"))
+    state_defaults_updated = ensure_claude_state_defaults(config_path)
     ruby_path = InstallCodex.runtime_path
     settings_updated = ensure_claude_settings(claude_home.join("settings.json"), repo_root, ruby_path, config_path)
     {
       "state_config_created" => state_created,
+      "state_defaults_updated" => state_defaults_updated,
       "runtime_path" => ruby_path.to_s,
       "settings_updated" => settings_updated
     }
@@ -118,6 +133,7 @@ module InstallClaude
     puts "- state config:  #{Pathname.new(options['state_dir']).join('session-secrets.toml')}"
     puts "- runtime:       #{results['runtime_path']}"
     puts "- created state config: #{results['state_config_created']}"
+    puts "- updated Claude defaults: #{results['state_defaults_updated']}"
     puts "- updated settings: #{results['settings_updated']}"
     puts "Restart Claude Code to pick up the updated hooks."
     0

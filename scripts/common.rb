@@ -1046,7 +1046,7 @@ module SessionSecrets
     aliases_text = imported.map { |item| placeholder_wrap(item.alias_name) }.join(", ")
     backend_names = imported.map(&:backend).uniq.sort.join(", ")
     count_text = imported.length == 1 ? "secret" : "secrets"
-    message = "Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}. "
+    message = +"Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}. "
     message << "The raw placeholder was blocked before it reached the model. Send the same request again using only those aliases."
     message << " Suggested resend: #{masked_prompt}" if masked_prompt && masked_prompt.length <= 240
     message
