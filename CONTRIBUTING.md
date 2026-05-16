@@ -28,7 +28,7 @@ Out of scope:
 ./uninstall-claude.sh
 /usr/bin/ruby tests/test_secret_guard.rb
 /usr/bin/ruby -c scripts/*.rb tests/test_secret_guard.rb
-bash -n scripts/run_with_secrets.sh install*.sh uninstall*.sh
+bash -n scripts/run_with_secrets.sh install*.sh uninstall*.sh bootstrap*.sh
 ```
 
 ## Test rules

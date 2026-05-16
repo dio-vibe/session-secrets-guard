@@ -209,6 +209,12 @@ Preferred path:
 ./install-claude.sh
 ```
 
+Or bootstrap from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dio-vibe/session-secrets-guard/main/bootstrap-claude.sh | bash
+```
+
 That installer:
 
 - uses macOS system Ruby at `/usr/bin/ruby`
