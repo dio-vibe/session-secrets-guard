@@ -220,11 +220,16 @@ That installer:
 - uses macOS system Ruby at `/usr/bin/ruby`
 - creates `~/.session-secrets-guard-claude/session-secrets.toml` if missing
 - sets `claude_prompt_import_mode = "block"` unless you already overrode it
+- copies alias-only resend prompts to the clipboard and tries to paste them back into the input box on raw-placeholder blocks
 - merges absolute-path hook commands into `~/.claude/settings.json`
 
 The checked-in [`examples/claude/settings.json`](examples/claude/settings.json)
 is only a template. It uses relative paths and is not the recommended install
 path for general users.
+
+If you do not want that macOS clipboard/paste assist, set either
+`claude_copy_resend_to_clipboard = false` or
+`claude_prefill_resend_prompt = false` in your state config.
 
 ## Removal
 
@@ -232,6 +237,12 @@ Standard removal:
 
 ```bash
 ./uninstall-plugin.sh
+```
+
+Or from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dio-vibe/session-secrets-guard/main/bootstrap-uninstall.sh | bash
 ```
 
 That removes:
@@ -249,6 +260,12 @@ Claude-only removal:
 ./uninstall-claude.sh
 ```
 
+Or from GitHub:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dio-vibe/session-secrets-guard/main/bootstrap-uninstall-claude.sh | bash
+```
+
 That removes this repo's managed hook entries from `~/.claude/settings.json`
 and preserves local state and Keychain items by default.
 
@@ -257,6 +274,13 @@ Full wipe:
 ```bash
 ./uninstall-plugin.sh --purge-state --purge-keychain
 ./uninstall-claude.sh --purge-state --purge-keychain
+```
+
+The same flags also work through the GitHub bootstraps:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dio-vibe/session-secrets-guard/main/bootstrap-uninstall.sh | bash -s -- --purge-state --purge-keychain
+curl -fsSL https://raw.githubusercontent.com/dio-vibe/session-secrets-guard/main/bootstrap-uninstall-claude.sh | bash -s -- --purge-state --purge-keychain
 ```
 
 ## Config
@@ -354,6 +378,14 @@ interface.
   Claude Code installer with absolute hook paths
 - [`uninstall-claude.sh`](uninstall-claude.sh)
   Claude Code uninstall helper for managed hooks
+- [`bootstrap.sh`](bootstrap.sh)
+  One-shot Codex installer from GitHub
+- [`bootstrap-claude.sh`](bootstrap-claude.sh)
+  One-shot Claude installer from GitHub
+- [`bootstrap-uninstall.sh`](bootstrap-uninstall.sh)
+  One-shot Codex uninstall helper from GitHub
+- [`bootstrap-uninstall-claude.sh`](bootstrap-uninstall-claude.sh)
+  One-shot Claude uninstall helper from GitHub
 - [`session-secrets.toml.example`](session-secrets.toml.example)
   Example defaults and alias config
 - [`scripts/`](scripts)

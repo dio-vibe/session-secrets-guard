@@ -828,6 +828,93 @@ module SessionSecrets
     mode
   end
 
+  def copy_resend_to_clipboard_enabled?(config, runtime)
+    runtime_key = "#{runtime}_copy_resend_to_clipboard"
+    configured =
+      if config.defaults.key?(runtime_key)
+        config.defaults[runtime_key]
+      else
+        config.defaults["copy_resend_to_clipboard"]
+      end
+
+    return configured unless configured.nil?
+
+    runtime == "claude"
+  end
+
+  def copy_text_to_clipboard(text)
+    return false unless text.is_a?(String) && !text.empty?
+    return false unless RUBY_PLATFORM.include?("darwin")
+
+    pbcopy = find_executable("pbcopy")
+    return false if pbcopy.nil?
+
+    success = false
+    Open3.popen3(pbcopy) do |stdin, stdout, stderr, wait_thr|
+      stdout.close
+      stderr.close
+      stdin.write(text)
+      stdin.close
+      success = wait_thr.value.success?
+    end
+    success
+  rescue StandardError
+    false
+  end
+
+  def copy_masked_prompt_to_clipboard(masked_prompt, config, runtime)
+    return false unless copy_resend_to_clipboard_enabled?(config, runtime)
+
+    copy_text_to_clipboard(masked_prompt)
+  end
+
+  def prefill_resend_prompt_enabled?(config, runtime)
+    runtime_key = "#{runtime}_prefill_resend_prompt"
+    configured =
+      if config.defaults.key?(runtime_key)
+        config.defaults[runtime_key]
+      else
+        config.defaults["prefill_resend_prompt"]
+      end
+
+    return configured unless configured.nil?
+
+    runtime == "claude"
+  end
+
+  def schedule_clipboard_paste(delay_seconds = 0.2)
+    return false unless RUBY_PLATFORM.include?("darwin")
+
+    osascript = find_executable("osascript")
+    return false if osascript.nil?
+
+    script = <<~APPLESCRIPT
+      delay #{delay_seconds}
+      tell application "System Events"
+        keystroke "v" using command down
+      end tell
+    APPLESCRIPT
+
+    pid = Process.spawn(osascript, "-e", script, out: File::NULL, err: File::NULL)
+    Process.detach(pid)
+    true
+  rescue StandardError
+    false
+  end
+
+  def prepare_blocked_prompt_resend(masked_prompt, config, runtime)
+    return :none unless masked_prompt.is_a?(String) && !masked_prompt.empty?
+
+    copied = copy_masked_prompt_to_clipboard(masked_prompt, config, runtime)
+    return :none unless copied
+
+    if prefill_resend_prompt_enabled?(config, runtime) && schedule_clipboard_paste
+      return :paste_scheduled
+    end
+
+    :copied
+  end
+
   def resolve_import_backend(config, backend_override = nil)
     backend = (backend_override || default_import_backend(config)).strip.downcase
     if backend == "auto"
@@ -1042,12 +1129,18 @@ module SessionSecrets
     message
   end
 
-  def build_import_success_message(imported, masked_prompt)
+  def build_import_success_message(imported, masked_prompt, resend_delivery: :none)
     aliases_text = imported.map { |item| placeholder_wrap(item.alias_name) }.join(", ")
     backend_names = imported.map(&:backend).uniq.sort.join(", ")
     count_text = imported.length == 1 ? "secret" : "secrets"
     message = +"Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}. "
     message << "The raw placeholder was blocked before it reached the model. Send the same request again using only those aliases."
+    case resend_delivery
+    when :paste_scheduled
+      message << " The alias-only resend prompt was copied and queued back into the input box. If it does not appear, paste once and press Enter."
+    when :copied
+      message << " The alias-only resend prompt was copied to your clipboard."
+    end
     message << " Suggested resend: #{masked_prompt}" if masked_prompt && masked_prompt.length <= 240
     message
   end

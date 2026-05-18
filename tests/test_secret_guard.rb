@@ -141,6 +141,18 @@ class SessionSecretsTest < Minitest::Test
     end
   end
 
+  def test_copy_masked_prompt_to_clipboard_defaults_to_claude_only
+    config = SessionSecrets::SecretConfig.new(path: nil, defaults: {}, aliases: {})
+    copied = []
+
+    SessionSecrets.stub(:copy_text_to_clipboard, ->(text) { copied << text; true }) do
+      assert_equal true, SessionSecrets.copy_masked_prompt_to_clipboard("safe resend", config, "claude")
+      assert_equal false, SessionSecrets.copy_masked_prompt_to_clipboard("safe resend", config, "codex")
+    end
+
+    assert_equal ["safe resend"], copied
+  end
+
   def test_user_prompt_submit_block_mode_blocks_after_import
     Dir.mktmpdir do |tmpdir|
       config_path = Pathname.new(tmpdir).join("session-secrets.toml")
@@ -155,14 +167,17 @@ class SessionSecretsTest < Minitest::Test
 
       response = nil
       with_env("SESSION_SECRETS_CONFIG" => config_path.to_s) do
-        response = UserPromptSubmitGuard.handle(
-          { "prompt" => "github token #{placeholder(fake_github_secret)} 저장해" },
-          "claude"
-        )
+        SessionSecrets.stub(:prepare_blocked_prompt_resend, :paste_scheduled) do
+          response = UserPromptSubmitGuard.handle(
+            { "prompt" => "github token #{placeholder(fake_github_secret)} 저장해" },
+            "claude"
+          )
+        end
       end
 
       assert_equal "block", response["decision"]
       assert_includes response["reason"], placeholder("github_token")
+      assert_includes response["reason"], "queued back into the input box"
     end
   end
 

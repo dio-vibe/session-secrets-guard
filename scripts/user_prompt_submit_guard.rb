@@ -18,9 +18,10 @@ module UserPromptSubmitGuard
       imported, _updated_config, masked_prompt = SessionSecrets.import_raw_secret_candidates(prompt, raw_imports, config)
       mode = SessionSecrets.prompt_import_mode(config, runtime)
       if mode == "block"
+        resend_delivery = SessionSecrets.prepare_blocked_prompt_resend(masked_prompt, config, runtime)
         return {
           "decision" => "block",
-          "reason" => SessionSecrets.build_import_success_message(imported, masked_prompt)
+          "reason" => SessionSecrets.build_import_success_message(imported, masked_prompt, resend_delivery: resend_delivery)
         }
       end
 
