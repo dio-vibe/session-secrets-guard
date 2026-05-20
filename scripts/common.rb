@@ -882,6 +882,22 @@ module SessionSecrets
     runtime == "claude"
   end
 
+  def accessibility_permission_granted?
+    return false unless RUBY_PLATFORM.include?("darwin")
+
+    osascript = find_executable("osascript")
+    return false if osascript.nil?
+
+    stdout, _stderr, status = Open3.capture3(
+      osascript,
+      "-e",
+      'tell application "System Events" to return UI elements enabled'
+    )
+    status.success? && stdout.strip.downcase == "true"
+  rescue StandardError
+    false
+  end
+
   def schedule_clipboard_paste(delay_seconds = 0.2)
     return false unless RUBY_PLATFORM.include?("darwin")
 
@@ -908,9 +924,9 @@ module SessionSecrets
     copied = copy_masked_prompt_to_clipboard(masked_prompt, config, runtime)
     return :none unless copied
 
-    if prefill_resend_prompt_enabled?(config, runtime) && schedule_clipboard_paste
-      return :paste_scheduled
-    end
+    return :copied unless prefill_resend_prompt_enabled?(config, runtime)
+    return :copied_no_accessibility unless accessibility_permission_granted?
+    return :paste_scheduled if schedule_clipboard_paste
 
     :copied
   end
@@ -1133,15 +1149,19 @@ module SessionSecrets
     aliases_text = imported.map { |item| placeholder_wrap(item.alias_name) }.join(", ")
     backend_names = imported.map(&:backend).uniq.sort.join(", ")
     count_text = imported.length == 1 ? "secret" : "secrets"
-    message = +"Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}. "
+    message = +"Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}.\n\n"
     message << "The raw placeholder was blocked before it reached the model. Send the same request again using only those aliases."
     case resend_delivery
     when :paste_scheduled
-      message << " The alias-only resend prompt was copied and queued back into the input box. If it does not appear, paste once and press Enter."
+      message << "\n\nThe alias-only resend prompt was copied and queued back into the input box. If it does not appear, paste once and press Enter."
     when :copied
-      message << " The alias-only resend prompt was copied to your clipboard."
+      message << "\n\nThe alias-only resend prompt was copied to your clipboard — paste it with Cmd+V and press Enter."
+    when :copied_no_accessibility
+      message << "\n\nThe alias-only resend prompt was copied to your clipboard — paste it with Cmd+V and press Enter." \
+                 "\n(Auto-paste is off because the terminal does not have macOS Accessibility permission;" \
+                 " grant it under System Settings → Privacy & Security → Accessibility to enable auto-paste.)"
     end
-    message << " Suggested resend: #{masked_prompt}" if masked_prompt && masked_prompt.length <= 240
+    message << "\n\nSuggested resend: #{masked_prompt}" if masked_prompt && masked_prompt.length <= 240
     message
   end
 

@@ -153,6 +153,58 @@ class SessionSecretsTest < Minitest::Test
     assert_equal ["safe resend"], copied
   end
 
+  def test_prepare_blocked_prompt_resend_falls_back_when_accessibility_denied
+    config = SessionSecrets::SecretConfig.new(path: nil, defaults: {}, aliases: {})
+    paste_calls = 0
+
+    SessionSecrets.stub(:copy_text_to_clipboard, ->(_text) { true }) do
+      SessionSecrets.stub(:accessibility_permission_granted?, false) do
+        SessionSecrets.stub(:schedule_clipboard_paste, ->(*) { paste_calls += 1; true }) do
+          assert_equal :copied_no_accessibility,
+                       SessionSecrets.prepare_blocked_prompt_resend("safe resend", config, "claude")
+        end
+      end
+    end
+
+    assert_equal 0, paste_calls
+  end
+
+  def test_prepare_blocked_prompt_resend_schedules_paste_when_accessibility_granted
+    config = SessionSecrets::SecretConfig.new(path: nil, defaults: {}, aliases: {})
+    paste_calls = 0
+
+    SessionSecrets.stub(:copy_text_to_clipboard, ->(_text) { true }) do
+      SessionSecrets.stub(:accessibility_permission_granted?, true) do
+        SessionSecrets.stub(:schedule_clipboard_paste, ->(*) { paste_calls += 1; true }) do
+          assert_equal :paste_scheduled,
+                       SessionSecrets.prepare_blocked_prompt_resend("safe resend", config, "claude")
+        end
+      end
+    end
+
+    assert_equal 1, paste_calls
+  end
+
+  def test_build_import_success_message_for_no_accessibility_advises_cmd_v
+    imported = [
+      SessionSecrets::ImportedSecret.new(
+        raw: "ghp_token",
+        alias_name: "github_token",
+        env_name: "GITHUB_TOKEN",
+        backend: "dotenv"
+      )
+    ]
+
+    message = SessionSecrets.build_import_success_message(
+      imported,
+      "github token #{SessionSecrets.placeholder_wrap('github_token')}",
+      resend_delivery: :copied_no_accessibility
+    )
+
+    assert_includes message, "Cmd+V"
+    assert_includes message, "Accessibility"
+  end
+
   def test_user_prompt_submit_block_mode_blocks_after_import
     Dir.mktmpdir do |tmpdir|
       config_path = Pathname.new(tmpdir).join("session-secrets.toml")

@@ -215,6 +215,12 @@ Or bootstrap from GitHub:
 curl -fsSL https://raw.githubusercontent.com/dio-vibe/session-secrets-guard/main/bootstrap-claude.sh | bash
 ```
 
+The bootstrap script clones the repo into
+`~/.session-secrets-guard-claude/repo` (override with
+`SESSION_SECRETS_GUARD_CLAUDE_REPO_DIR`) and then runs `install-claude.sh` from
+there, so the absolute hook paths it bakes into `~/.claude/settings.json` keep
+resolving after the bootstrap process exits.
+
 That installer:
 
 - uses macOS system Ruby at `/usr/bin/ruby`
@@ -230,6 +236,13 @@ path for general users.
 If you do not want that macOS clipboard/paste assist, set either
 `claude_copy_resend_to_clipboard = false` or
 `claude_prefill_resend_prompt = false` in your state config.
+
+Auto-paste needs macOS Accessibility permission on the terminal app running
+Claude Code (for example iTerm2). When the permission is missing, the hook
+detects that and falls back to clipboard-only, and the block message tells you
+to paste with Cmd+V. Grant the permission under **System Settings → Privacy
+& Security → Accessibility** if you want the input box to be prefilled
+automatically.
 
 ## Removal
 
