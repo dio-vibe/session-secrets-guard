@@ -237,6 +237,13 @@ If you do not want that macOS clipboard/paste assist, set either
 `claude_copy_resend_to_clipboard = false` or
 `claude_prefill_resend_prompt = false` in your state config.
 
+Auto-paste needs macOS Accessibility permission on the terminal app running
+Claude Code (for example iTerm2). When the permission is missing, the hook
+detects that and falls back to clipboard-only, and the block message tells you
+to paste with Cmd+V. Grant the permission under **System Settings → Privacy
+& Security → Accessibility** if you want the input box to be prefilled
+automatically.
+
 ## Removal
 
 Standard removal:
