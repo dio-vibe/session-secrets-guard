@@ -215,6 +215,12 @@ Or bootstrap from GitHub:
 curl -fsSL https://raw.githubusercontent.com/dio-vibe/session-secrets-guard/main/bootstrap-claude.sh | bash
 ```
 
+The bootstrap script clones the repo into
+`~/.session-secrets-guard-claude/repo` (override with
+`SESSION_SECRETS_GUARD_CLAUDE_REPO_DIR`) and then runs `install-claude.sh` from
+there, so the absolute hook paths it bakes into `~/.claude/settings.json` keep
+resolving after the bootstrap process exits.
+
 That installer:
 
 - uses macOS system Ruby at `/usr/bin/ruby`

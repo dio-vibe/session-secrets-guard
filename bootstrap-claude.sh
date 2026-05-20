@@ -6,26 +6,24 @@ REPO_REF="${SESSION_SECRETS_GUARD_REF:-main}"
 ARCHIVE_URL="https://codeload.github.com/${REPO_SLUG}/tar.gz/refs/heads/${REPO_REF}"
 GIT_URL="https://github.com/${REPO_SLUG}.git"
 
-tmpdir="$(mktemp -d)"
-cleanup() {
-  rm -rf "$tmpdir"
-}
-trap cleanup EXIT
-
-checkout_dir="$tmpdir/repo"
+INSTALL_DIR="${SESSION_SECRETS_GUARD_CLAUDE_REPO_DIR:-$HOME/.session-secrets-guard-claude/repo}"
+mkdir -p "$(dirname "$INSTALL_DIR")"
 
 if command -v git >/dev/null 2>&1; then
-  git clone --depth=1 --branch "$REPO_REF" "$GIT_URL" "$checkout_dir" >/dev/null 2>&1
+  rm -rf "$INSTALL_DIR"
+  git clone --depth=1 --branch "$REPO_REF" "$GIT_URL" "$INSTALL_DIR" >/dev/null 2>&1
 else
+  tmpdir="$(mktemp -d)"
+  trap 'rm -rf "$tmpdir"' EXIT
   archive_path="$tmpdir/repo.tar.gz"
   curl -fsSL "$ARCHIVE_URL" -o "$archive_path"
-  mkdir -p "$checkout_dir"
   tar -xzf "$archive_path" -C "$tmpdir"
   extracted_dir="$tmpdir/$(basename "$REPO_SLUG")-$REPO_REF"
   if [[ ! -d "$extracted_dir" ]]; then
     extracted_dir="$(find "$tmpdir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
   fi
-  mv "$extracted_dir" "$checkout_dir"
+  rm -rf "$INSTALL_DIR"
+  mv "$extracted_dir" "$INSTALL_DIR"
 fi
 
-exec "$checkout_dir/install-claude.sh" "$@"
+exec "$INSTALL_DIR/install-claude.sh" "$@"
