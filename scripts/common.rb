@@ -1149,19 +1149,19 @@ module SessionSecrets
     aliases_text = imported.map { |item| placeholder_wrap(item.alias_name) }.join(", ")
     backend_names = imported.map(&:backend).uniq.sort.join(", ")
     count_text = imported.length == 1 ? "secret" : "secrets"
-    message = +"Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}. "
+    message = +"Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}.\n\n"
     message << "The raw placeholder was blocked before it reached the model. Send the same request again using only those aliases."
     case resend_delivery
     when :paste_scheduled
-      message << " The alias-only resend prompt was copied and queued back into the input box. If it does not appear, paste once and press Enter."
+      message << "\n\nThe alias-only resend prompt was copied and queued back into the input box. If it does not appear, paste once and press Enter."
     when :copied
-      message << " The alias-only resend prompt was copied to your clipboard — paste it with Cmd+V and press Enter."
+      message << "\n\nThe alias-only resend prompt was copied to your clipboard — paste it with Cmd+V and press Enter."
     when :copied_no_accessibility
-      message << " The alias-only resend prompt was copied to your clipboard — paste it with Cmd+V and press Enter." \
-                 " (Auto-paste is off because the terminal does not have macOS Accessibility permission;" \
+      message << "\n\nThe alias-only resend prompt was copied to your clipboard — paste it with Cmd+V and press Enter." \
+                 "\n(Auto-paste is off because the terminal does not have macOS Accessibility permission;" \
                  " grant it under System Settings → Privacy & Security → Accessibility to enable auto-paste.)"
     end
-    message << " Suggested resend: #{masked_prompt}" if masked_prompt && masked_prompt.length <= 240
+    message << "\n\nSuggested resend: #{masked_prompt}" if masked_prompt && masked_prompt.length <= 240
     message
   end
 
