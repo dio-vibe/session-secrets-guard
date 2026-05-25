@@ -35,6 +35,20 @@ module SessionSecrets
     ]
   ].freeze
 
+  IMPORTABLE_SECRET_PATTERNS = [
+    ["github_token", /\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{40,})\b/, 0],
+    ["openai_key", /\bsk-[A-Za-z0-9]{20,}\b/, 0],
+    ["slack_token", /\bxox[baprs]-[A-Za-z0-9-]{10,}\b/, 0],
+    ["aws_access_key", /\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/, 0],
+    ["jwt", /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]{10,}\b/, 0],
+    ["pem_private_key", /-----BEGIN [A-Z ]*PRIVATE KEY-----/, 0],
+    [
+      "secret_assignment",
+      %r{\b(?:token|secret|api[_-]?key|access[_-]?key|password)\b\s*[:=]\s*['"]?([A-Za-z0-9_./+=-]{12,})['"]?}i,
+      1
+    ]
+  ].freeze
+
   SENSITIVE_BASH_PATTERNS = [
     [
       "print_secret_env",
@@ -433,10 +447,54 @@ module SessionSecrets
     imports
   end
 
+  def parse_detected_secret_imports(text, config)
+    imports = []
+    protected_ranges = inline_ref_ranges(text)
+    occupied_ranges = []
+
+    IMPORTABLE_SECRET_PATTERNS.each do |_name, pattern, capture_index|
+      text.to_s.to_enum(:scan, pattern).each do
+        match = Regexp.last_match
+        start_index, stop_index = match.offset(capture_index)
+        next if start_index.nil? || stop_index.nil? || start_index == stop_index
+        next if overlap_with_ranges?(start_index, stop_index, protected_ranges)
+        next if overlap_with_ranges?(start_index, stop_index, occupied_ranges)
+
+        raw = text[start_index...stop_index]
+        next if raw.nil? || raw.empty?
+        next unless parse_inline_secret_ref(raw, raw.strip, config).nil?
+
+        imports << RawSecretImport.new(
+          raw: raw,
+          body: raw,
+          start: start_index,
+          stop: stop_index,
+          context_snippet: build_context_snippet(text, start_index, stop_index)
+        )
+        occupied_ranges << [start_index, stop_index]
+      end
+    end
+
+    imports
+  end
+
   def build_context_snippet(text, start_index, stop_index, radius = 80)
     before = text[[0, start_index - radius].max...start_index]
     after = text[stop_index...[text.length, stop_index + radius].min]
     "#{before}[secret]#{after}"
+  end
+
+  def inline_ref_ranges(text)
+    text.to_s.to_enum(:scan, INLINE_SECRET_REF_PATTERN).map do
+      match = Regexp.last_match
+      [match.begin(0), match.end(0)]
+    end
+  end
+
+  def overlap_with_ranges?(start_index, stop_index, ranges)
+    ranges.any? do |range_start, range_stop|
+      start_index < range_stop && stop_index > range_start
+    end
   end
 
   def parse_inline_secret_ref(raw, body, config)
@@ -1145,12 +1203,12 @@ module SessionSecrets
     message
   end
 
-  def build_import_success_message(imported, masked_prompt, resend_delivery: :none)
+  def build_import_success_message(imported, masked_prompt, resend_delivery: :none, blocked_content: "The raw placeholder")
     aliases_text = imported.map { |item| placeholder_wrap(item.alias_name) }.join(", ")
     backend_names = imported.map(&:backend).uniq.sort.join(", ")
     count_text = imported.length == 1 ? "secret" : "secrets"
     message = +"Stored #{imported.length} #{count_text} locally via #{backend_names} as #{aliases_text}.\n\n"
-    message << "The raw placeholder was blocked before it reached the model. Send the same request again using only those aliases."
+    message << "#{blocked_content} was blocked before it reached the model. Send the same request again using only those aliases."
     case resend_delivery
     when :paste_scheduled
       message << "\n\nThe alias-only resend prompt was copied and queued back into the input box. If it does not appear, paste once and press Enter."

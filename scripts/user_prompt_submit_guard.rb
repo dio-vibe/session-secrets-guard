@@ -34,6 +34,21 @@ module UserPromptSubmitGuard
       }
     end
 
+    direct_imports = SessionSecrets.parse_detected_secret_imports(prompt, config)
+    unless direct_imports.empty?
+      imported, _updated_config, masked_prompt = SessionSecrets.import_raw_secret_candidates(prompt, direct_imports, config)
+      resend_delivery = SessionSecrets.prepare_blocked_prompt_resend(masked_prompt, config, runtime)
+      return {
+        "decision" => "block",
+        "reason" => SessionSecrets.build_import_success_message(
+          imported,
+          masked_prompt,
+          resend_delivery: resend_delivery,
+          blocked_content: "The detected secret value"
+        )
+      }
+    end
+
     hits = SessionSecrets.find_secret_hits(prompt)
     unless hits.empty?
       return {

@@ -20,6 +20,10 @@ It handles two jobs:
 1. Import raw `[[secret]]` chat placeholders into a local backend.
 2. Teach the agent to keep using aliases and backend locations instead of raw values.
 
+Known token or key literals pasted directly in chat can also be imported,
+blocked before they reach the model, and turned into an alias-only resend
+prompt.
+
 ## User model
 
 The intended user model is simple:
@@ -122,6 +126,9 @@ prompt_import_mode = "block"
 
 Claude Code can do the stricter import-and-block flow, and it can also rewrite
 Bash tool input through `PreToolUse.updatedInput`.
+
+That stricter flow now applies both to raw `[[secret]]` placeholders and to
+directly pasted token or key literals that match the built-in detectors.
 
 ## Supported backends
 

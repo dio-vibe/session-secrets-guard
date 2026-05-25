@@ -259,6 +259,36 @@ class SessionSecretsTest < Minitest::Test
     end
   end
 
+  def test_user_prompt_submit_plain_secret_blocks_after_import_with_alias_resend
+    Dir.mktmpdir do |tmpdir|
+      config_path = Pathname.new(tmpdir).join("session-secrets.toml")
+      write_secret_config(
+        config_path,
+        defaults: {
+          "import_backend" => "dotenv",
+          "prompt_import_mode" => "allow_and_scrub",
+          "default_dotenv_path" => ".env"
+        }
+      )
+
+      response = nil
+      with_env("SESSION_SECRETS_CONFIG" => config_path.to_s) do
+        SessionSecrets.stub(:prepare_blocked_prompt_resend, :paste_scheduled) do
+          response = UserPromptSubmitGuard.handle(
+            { "prompt" => "github token #{fake_github_secret} 저장해" },
+            "claude"
+          )
+        end
+      end
+
+      assert_equal "block", response["decision"]
+      assert_includes response["reason"], "detected secret value was blocked"
+      assert_includes response["reason"], placeholder("github_token")
+      assert_includes response["reason"], "Suggested resend: github token #{placeholder('github_token')} 저장해"
+      assert_includes Pathname.new(tmpdir).join(".env").read, "GITHUB_TOKEN="
+    end
+  end
+
   def test_pre_tool_use_rewrites_claude_bash_placeholders
     Dir.mktmpdir do |tmpdir|
       config_path = Pathname.new(tmpdir).join("session-secrets.toml")
