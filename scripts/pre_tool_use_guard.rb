@@ -67,14 +67,26 @@ module PreToolUseGuard
     unless SessionSecrets.is_secret_runner_command(command)
       bash_hits = SessionSecrets.find_sensitive_bash_hits(command)
       unless bash_hits.empty?
+        guidance = build_sensitive_bash_guidance(bash_hits)
         return deny(
           "This Bash command looks like it would print or fetch secret material directly (#{SessionSecrets.summarize_hits(bash_hits)}). " \
-          "Resolve the alias from its configured backend and avoid printing raw secret material."
+          "Avoid printing raw secret material. #{guidance}"
         )
       end
     end
 
     nil
+  end
+
+  def build_sensitive_bash_guidance(hits)
+    guidance = []
+    if hits.include?("dump_secret_file")
+      guidance << "For env or credential files, use the masking helper instead, for example: " \
+                  "ruby scripts/mask_env_file.rb path/to/.env. " \
+                  "For remote files, run an equivalent remote command that prints keys plus masked length/fingerprint, not values."
+    end
+    guidance << "If a command needs the value, resolve a configured alias from its backend and inject it as an env var."
+    guidance.join(" ")
   end
 
   def deny(reason)

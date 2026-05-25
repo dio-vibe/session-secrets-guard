@@ -347,6 +347,19 @@ Examples:
 
 If a name is already taken, the importer appends `_2`, `_3`, and so on.
 
+## Inspecting env files safely
+
+Do not dump `.env` files with `cat`. Use the masking helper when you need to
+check shape, presence, length, or whether two values changed:
+
+```bash
+ruby scripts/mask_env_file.rb path/to/.env
+```
+
+By default it prints `KEY=<set len=N sha256=...>` without value fragments.
+Use `--show-fragments` only when short first/last fragments are needed and the
+output location is acceptable for that exposure.
+
 ## Known limitations
 
 - Codex currently cannot rewrite Bash tool input through hooks the way Claude can.

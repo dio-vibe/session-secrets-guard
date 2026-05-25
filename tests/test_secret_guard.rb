@@ -11,6 +11,7 @@ require_relative "../scripts/common"
 require_relative "../scripts/install_claude"
 require_relative "../scripts/install_codex"
 require_relative "../scripts/install_codex_plugin"
+require_relative "../scripts/mask_env_file"
 require_relative "../scripts/post_tool_use_guard"
 require_relative "../scripts/pre_tool_use_guard"
 require_relative "../scripts/session_start_context"
@@ -349,6 +350,40 @@ class SessionSecretsTest < Minitest::Test
 
       assert_equal "deny", response.dig("hookSpecificOutput", "permissionDecision")
     end
+  end
+
+  def test_pre_tool_use_dump_secret_file_denial_includes_masked_value_guidance
+    response = PreToolUseGuard.handle(
+      {
+        "tool_name" => "Bash",
+        "tool_input" => { "command" => "ssh host 'cat ~/.hermes/.env'" }
+      },
+      "claude"
+    )
+
+    reason = response.dig("hookSpecificOutput", "permissionDecisionReason")
+    assert_equal "deny", response.dig("hookSpecificOutput", "permissionDecision")
+    assert_includes reason, "dump_secret_file"
+    assert_includes reason, "masking helper"
+    assert_includes reason, "ruby scripts/mask_env_file.rb path/to/.env"
+    assert_includes reason, "masked length/fingerprint"
+  end
+
+  def test_mask_env_file_masks_values_without_value_fragments_by_default
+    masked = MaskEnvFile.mask_env_text("COLOR=abcdef1234567890\nEMPTY=\n# keep\nPLAIN\n")
+
+    assert_includes masked, "COLOR=<set len=16 sha256="
+    refute_includes masked, "abcdef"
+    assert_includes masked, "EMPTY=<empty>"
+    assert_includes masked, "# keep"
+    assert_includes masked, "PLAIN"
+  end
+
+  def test_mask_env_file_can_show_short_fragments_when_requested
+    masked = MaskEnvFile.mask_env_text("COLOR=abcdef1234567890\n", show_fragments: true)
+
+    assert_includes masked, "COLOR=<set abcd...7890 len=16 sha256="
+    refute_includes masked, "abcdef1234567890"
   end
 
   def test_post_tool_use_blocks_secret_like_output

@@ -9,6 +9,8 @@ create a project runtime anymore.
   - shared detection, config parsing, resolver, import, scrub, and command rewrite helpers
 - `run_with_secrets.sh`
   - dependency-free bash helper used by Claude Bash rewrites to resolve backend refs and exec with injected env vars
+- `mask_env_file.rb`
+  - prints `.env`-style files with values replaced by length and fingerprint; `--show-fragments` also shows short first/last fragments
 - `install_codex.rb`
   - one-command Codex installer that updates `~/.codex/config.toml` and `~/.codex/hooks.json`
 - `install_codex_plugin.rb`
