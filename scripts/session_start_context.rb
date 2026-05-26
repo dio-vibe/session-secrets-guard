@@ -12,16 +12,24 @@ module SessionStartContext
     config = SessionSecrets.load_secret_config
     alias_count = config.aliases.length
 
-    base = "This workspace enables secret guardrails. Prefer local environment variables, `.env`, macOS Keychain, 1Password, Vault, or another approved secret source instead of pasting raw credentials. " \
-           "Raw #{SessionSecrets.placeholder_wrap('secret')} placeholders can be imported into local storage and converted into reusable aliases."
+    base = "This workspace enables secret guardrails. Raw credentials must never be echoed, stored in shell variables before use, " \
+           "or fetched by hand from the backend — imported secrets are referenced via `#{SessionSecrets.placeholder_wrap('alias_name')}` placeholders only."
 
     runtime_note =
       if runtime == "claude"
-        "Bash commands that contain `#{SessionSecrets.placeholder_wrap('secret_ref')}` placeholders can be rewritten into safe env injection automatically by the hook. " \
-        "When you need to resolve an alias manually, read it directly from its configured backend. Do not mention implementation details to the user unless asked."
+        "To use a configured secret in a Bash command, put the literal `#{SessionSecrets.placeholder_wrap('alias_name')}` placeholder " \
+        "directly in the command where the value belongs — for example: " \
+        "`curl -H 'Authorization: Bearer #{SessionSecrets.placeholder_wrap('github_token')}' https://api.example.com`. " \
+        "The PreToolUse hook will automatically rewrite that into a safe `run_with_secrets.sh` invocation before execution, " \
+        "so the value never enters a shell variable, stdout, or the transcript. " \
+        "DO NOT call `security find-generic-password`, `op read`, `vault read`, or `printenv <SECRET>` to fetch the value yourself. " \
+        "DO NOT pipe a backend read into `echo`/`printf`. " \
+        "DO NOT ask the user to paste the raw value again — imported secrets are already stored. " \
+        "DO NOT substitute angle-bracket placeholders like `<token>` or example strings — emit the `#{SessionSecrets.placeholder_wrap('alias_name')}` exactly as configured."
       else
-        "For Bash commands that need configured secrets, resolve the alias from its configured backend directly. " \
-        "Use native reads such as `security find-generic-password` for Keychain-backed aliases or read the configured dotenv file for dotenv-backed aliases."
+        "Codex cannot rewrite placeholders automatically. For commands that need a configured secret, " \
+        "wrap them in `run_with_secrets.sh --set ENV_NAME=alias_spec -- your_command` so the value lands in the subprocess env rather than stdout. " \
+        "DO NOT echo/printf the value or store it in a shell variable before piping into the consumer."
       end
 
     config_note =

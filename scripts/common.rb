@@ -52,7 +52,11 @@ module SessionSecrets
   SENSITIVE_BASH_PATTERNS = [
     [
       "print_secret_env",
-      /\b(?:echo|printf|printenv)\b[^\n]*(?:token|secret|api[_-]?key|password|access[_-]?key)/i
+      /\b(?:echo|printf)\b[^\n]*\$\{?\w*(?:TOKEN|SECRET|API[_-]?KEY|PASSWORD|ACCESS[_-]?KEY)\b/i
+    ],
+    [
+      "printenv_secret",
+      /\bprintenv\b\s+\w*(?:TOKEN|SECRET|API[_-]?KEY|PASSWORD|ACCESS[_-]?KEY)\b/i
     ],
     [
       "dump_secret_file",
@@ -832,6 +836,20 @@ module SessionSecrets
 
   def describe_imported_secret(item)
     "#{placeholder_wrap(item.alias_name)} stored at #{describe_secret_target(item.target)}"
+  end
+
+  def bash_block_directive(runtime)
+    if runtime_supports_input_rewrite(runtime)
+      "Instead, put the configured `#{placeholder_wrap('alias_name')}` placeholder directly in the command where the value belongs " \
+      "— for example `curl -H 'Authorization: Bearer #{placeholder_wrap('github_token')}' https://api.example.com`. " \
+      "The PreToolUse hook will rewrite that into a safe `run_with_secrets.sh` invocation automatically, " \
+      "so the value never enters a shell variable, stdout, or the transcript. " \
+      "Do not call `security find-generic-password`, `op read`, `vault read`, or pipe a backend read into `echo`/`printf`/`printenv`."
+    else
+      "Instead, wrap the command in `run_with_secrets.sh --set ENV_NAME=alias_spec -- your_command` " \
+      "so the value lands in the subprocess env rather than stdout. " \
+      "Do not echo/printf the value or store it in a shell variable before piping into the consumer."
+    end
   end
 
   def runtime_supports_input_rewrite(runtime)
