@@ -401,7 +401,68 @@ class SessionSecretsTest < Minitest::Test
     response = SessionStartContext.handle("claude")
     context = response.dig("hookSpecificOutput", "additionalContext")
 
-    assert_includes context, "rewritten into safe env injection"
+    assert_includes context, "rewrite that into a safe `run_with_secrets.sh` invocation"
+    assert_includes context, placeholder_wrap_alias("github_token")
+    assert_includes context, "DO NOT call `security find-generic-password`"
+  end
+
+  def test_session_start_context_codex_points_at_run_with_secrets_wrap
+    response = SessionStartContext.handle("codex")
+    context = response.dig("hookSpecificOutput", "additionalContext")
+
+    assert_includes context, "run_with_secrets.sh --set"
+    assert_includes context, "DO NOT echo/printf the value"
+  end
+
+  def test_find_sensitive_bash_hits_catches_print_with_var_ref
+    assert_equal ["print_secret_env"], SessionSecrets.find_sensitive_bash_hits("echo $GITHUB_TOKEN")
+    assert_equal ["print_secret_env"], SessionSecrets.find_sensitive_bash_hits('printf "%s" "$DB_PASSWORD"')
+    assert_equal ["printenv_secret"], SessionSecrets.find_sensitive_bash_hits("printenv MY_API_KEY")
+  end
+
+  def test_find_sensitive_bash_hits_ignores_echo_without_secret_var_ref
+    assert_empty SessionSecrets.find_sensitive_bash_hits('echo "look at the token docs"')
+    assert_empty SessionSecrets.find_sensitive_bash_hits('printf "deploying to staging\n"')
+    assert_empty SessionSecrets.find_sensitive_bash_hits("echo $PATH")
+    assert_empty SessionSecrets.find_sensitive_bash_hits('ls ~/.session-secrets-guard/ && echo "---"')
+  end
+
+  def test_find_sensitive_bash_hits_ignores_kubectl_get_secret
+    assert_empty SessionSecrets.find_sensitive_bash_hits("kubectl get secret mysecret -o name")
+    assert_empty SessionSecrets.find_sensitive_bash_hits("aws secretsmanager list-secrets")
+  end
+
+  def test_pre_tool_use_denial_reason_includes_runtime_directive_for_claude
+    response = PreToolUseGuard.handle(
+      {
+        "tool_name" => "Bash",
+        "tool_input" => { "command" => "echo $GITHUB_TOKEN" }
+      },
+      "claude"
+    )
+
+    reason = response.dig("hookSpecificOutput", "permissionDecisionReason")
+    assert_equal "deny", response.dig("hookSpecificOutput", "permissionDecision")
+    assert_includes reason, "PreToolUse hook will rewrite"
+    assert_includes reason, placeholder_wrap_alias("github_token")
+  end
+
+  def test_pre_tool_use_denial_reason_includes_runtime_directive_for_codex
+    response = PreToolUseGuard.handle(
+      {
+        "tool_name" => "Bash",
+        "tool_input" => { "command" => "echo $GITHUB_TOKEN" }
+      },
+      "codex"
+    )
+
+    reason = response.dig("hookSpecificOutput", "permissionDecisionReason")
+    assert_equal "deny", response.dig("hookSpecificOutput", "permissionDecision")
+    assert_includes reason, "run_with_secrets.sh --set"
+  end
+
+  def placeholder_wrap_alias(name)
+    SessionSecrets.placeholder_wrap(name)
   end
 
   def test_install_codex_merge_replaces_old_managed_hook_commands
