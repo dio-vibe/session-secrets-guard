@@ -13,6 +13,7 @@ require_relative "../scripts/install_codex"
 require_relative "../scripts/install_codex_plugin"
 require_relative "../scripts/mask_env_file"
 require_relative "../scripts/post_tool_use_guard"
+require_relative "../scripts/list_aliases"
 require_relative "../scripts/pre_tool_use_guard"
 require_relative "../scripts/session_start_context"
 require_relative "../scripts/stop_session_scrub"
@@ -650,6 +651,44 @@ class SessionSecretsTest < Minitest::Test
       assert_includes rollout_path.read, placeholder(alias_name)
       assert_includes history_path.read, placeholder(alias_name)
       refute pending_path.exist? && !read_json(pending_path).empty?
+    end
+  end
+
+  def test_list_aliases_renders_each_alias_without_values
+    Dir.mktmpdir do |tmpdir|
+      config_path = Pathname.new(tmpdir).join("session-secrets.toml")
+      write_secret_config(
+        config_path,
+        defaults: { "keychain_service" => "session-secrets-guard" },
+        aliases: {
+          "github_token" => { "source" => "env", "env_name" => "GITHUB_TOKEN", "name" => "GITHUB_TOKEN" },
+          "openai_api_key" => { "source" => "dotenv", "env_name" => "OPENAI_API_KEY", "path" => ".env", "key" => "OPENAI_API_KEY" },
+          "session_secret" => { "source" => "keychain", "env_name" => "SESSION_SECRET", "service" => "session-secrets-guard", "account" => "session_secret" }
+        }
+      )
+
+      config = SessionSecrets.load_secret_config(config_path)
+      output = ListAliases.render(config)
+
+      assert_includes output, "github_token"
+      assert_includes output, "openai_api_key"
+      assert_includes output, "session_secret"
+      assert_includes output, "env(name=GITHUB_TOKEN)"
+      assert_includes output, "dotenv(path=.env, key=OPENAI_API_KEY)"
+      assert_includes output, "keychain(service=session-secrets-guard, account=session_secret)"
+      assert_includes output, "Values are never printed by this command"
+    end
+  end
+
+  def test_list_aliases_renders_empty_message_when_no_aliases
+    Dir.mktmpdir do |tmpdir|
+      config_path = Pathname.new(tmpdir).join("session-secrets.toml")
+      write_secret_config(config_path)
+
+      config = SessionSecrets.load_secret_config(config_path)
+      output = ListAliases.render(config)
+
+      assert_includes output, "No secret aliases configured"
     end
   end
 end
