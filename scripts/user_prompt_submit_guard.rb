@@ -69,11 +69,20 @@ module UserPromptSubmitGuard
 
     return nil if refs.empty?
 
+    sample_alias = refs.first&.body || "alias_name"
     rewrite_note =
       if SessionSecrets.runtime_supports_input_rewrite(runtime)
-        "Bash commands that keep the `#{SessionSecrets.placeholder_wrap('...')}` placeholders can be rewritten into safe env injection automatically."
+        "To use one of these credentials in a Bash command, put the literal placeholder " \
+        "`#{SessionSecrets.placeholder_wrap(sample_alias)}` (square brackets and all) directly in the command where the value belongs " \
+        "— for example: `curl -H \"Authorization: Bearer #{SessionSecrets.placeholder_wrap(sample_alias)}\" https://api.example.com`. " \
+        "The PreToolUse hook will rewrite that into safe `env`-based injection before execution; you do not resolve the alias yourself, " \
+        "you do not ask the user for the value, and you do not replace it with angle-bracket placeholders like `<token>` or example strings."
       else
-        "Codex cannot rewrite `#{SessionSecrets.placeholder_wrap('...')}` placeholders automatically, so resolve each alias from its configured backend before running shell commands."
+        "Codex does not rewrite `#{SessionSecrets.placeholder_wrap('...')}` placeholders automatically. " \
+        "For each alias, read its value once from the configured backend " \
+        "(for keychain entries that is `security find-generic-password -s <service> -a <account> -w`), " \
+        "export it as the alias's env var name, and reference `\\$ENV_NAME` from the shell command. " \
+        "Never echo, printf, or otherwise print the resolved value to stdout."
       end
 
     {
