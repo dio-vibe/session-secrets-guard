@@ -54,6 +54,29 @@ The intended user model is simple:
 
 Most users should not need to know about any internal helper script.
 
+### Choosing the alias name yourself
+
+By default the hook infers an alias name from the surrounding text (or from the
+token shape), falling back to `session_secret`. To name the alias explicitly at
+import time, prefix the value with `name=`:
+
+```text
+이거 [[kube=raw-token-value]] 로 저장해줘
+```
+
+The part before the first `=` becomes the alias (it must be a valid alias name:
+`^[a-z][a-z0-9_]{0,63}$`), and everything after the first `=` is the stored
+value. If your secret itself starts with an alias-like word and contains `=`
+(connection strings, base64 with internal `=`, etc.), use the `raw:` escape
+hatch to skip name parsing entirely:
+
+```text
+[[raw:user=admin;pwd=p@ss=word==]]
+```
+
+That stores the whole `user=admin;pwd=p@ss=word==` value verbatim and auto-names
+the alias.
+
 ## Example flow
 
 Minimal Codex or Claude flow:

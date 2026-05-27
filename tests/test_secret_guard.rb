@@ -84,6 +84,42 @@ class SessionSecretsTest < Minitest::Test
     end
   end
 
+  def test_split_named_import_uses_explicit_name_when_prefix_is_alias_like
+    assert_equal ["kube", "ZmFrZXZhbHVl"], SessionSecrets.split_named_import("kube=ZmFrZXZhbHVl")
+    assert_equal ["db_pw", "s3cr3t"], SessionSecrets.split_named_import("db_pw=s3cr3t")
+  end
+
+  def test_split_named_import_keeps_value_with_equals_when_name_is_not_alias_like
+    # Uppercase / shape-y prefixes are not valid alias names, so the whole body stays the value.
+    assert_equal [nil, "YWJjZA=="], SessionSecrets.split_named_import("YWJjZA==")
+    assert_equal [nil, "PlainValueNoEquals"], SessionSecrets.split_named_import("PlainValueNoEquals")
+  end
+
+  def test_split_named_import_raw_prefix_forces_raw_value_even_with_equals
+    assert_equal [nil, "user=admin;pwd=x=y=="], SessionSecrets.split_named_import("raw:user=admin;pwd=x=y==")
+    assert_equal [nil, "kube=value"], SessionSecrets.split_named_import("raw:kube=value")
+  end
+
+  def test_import_raw_secret_candidates_honors_requested_name
+    Dir.mktmpdir do |tmpdir|
+      config = SessionSecrets::SecretConfig.new(
+        path: Pathname.new(tmpdir).join("session-secrets.toml"),
+        defaults: { "import_backend" => "dotenv", "default_dotenv_path" => ".env" },
+        aliases: {}
+      )
+
+      prompt = "store this [[kube=ZmFrZXZhbHVl]] please"
+      imports = SessionSecrets.parse_raw_secret_imports(prompt, config)
+      imported, updated_config, masked = SessionSecrets.import_raw_secret_candidates(prompt, imports, config)
+
+      assert_equal "kube", imported.first.alias_name
+      assert_equal "KUBE", imported.first.env_name
+      assert updated_config.aliases.key?("kube")
+      assert_includes masked, SessionSecrets.placeholder_wrap("kube")
+      assert_includes Pathname.new(tmpdir).join(".env").read, "KUBE="
+    end
+  end
+
   def test_import_secret_value_writes_dotenv_and_alias_config
     Dir.mktmpdir do |tmpdir|
       config_path = Pathname.new(tmpdir).join("session-secrets.toml")
