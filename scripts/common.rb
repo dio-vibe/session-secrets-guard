@@ -91,7 +91,7 @@ module SessionSecrets
 
   SecretConfig = Struct.new(:path, :defaults, :aliases, keyword_init: true)
   SecretTarget = Struct.new(:spec, :source, :env_name, :metadata, keyword_init: true)
-  RawSecretImport = Struct.new(:raw, :body, :start, :stop, :context_snippet, keyword_init: true)
+  RawSecretImport = Struct.new(:raw, :body, :start, :stop, :context_snippet, :requested_name, keyword_init: true)
   ImportedSecret = Struct.new(:raw, :alias_name, :env_name, :backend, :target, keyword_init: true)
   SessionContext = Struct.new(:thread_id, :session_id, :rollout_path, :transcript_path, :cwd, keyword_init: true)
   PendingSessionScrub = Struct.new(
@@ -438,17 +438,35 @@ module SessionSecrets
       raw = match[0]
       body = match[1].strip
       next unless parse_inline_secret_ref(raw, body, config).nil?
-      next if body.empty?
+
+      requested_name, value = split_named_import(body)
+      next if value.empty?
 
       imports << RawSecretImport.new(
         raw: raw,
-        body: body,
+        body: value,
         start: match.begin(0),
         stop: match.end(0),
-        context_snippet: build_context_snippet(text, match.begin(0), match.end(0))
+        context_snippet: build_context_snippet(text, match.begin(0), match.end(0)),
+        requested_name: requested_name
       )
     end
     imports
+  end
+
+  # Splits a raw `[[...]]` body into an optional user-requested alias name and
+  # the secret value. Supports two explicit forms plus the default:
+  #   `name=value` -> ["name", "value"] when `name` is a strict alias name
+  #   `raw:value`  -> [nil, "value"]    (escape hatch; never name-parsed, so a
+  #                                      secret that itself contains `=` is safe)
+  #   anything else -> [nil, body]      (existing auto-naming behavior)
+  def split_named_import(body)
+    return [nil, body.sub(/\Araw:\s*/, "")] if body.start_with?("raw:")
+
+    match = body.match(/\A([a-z][a-z0-9_]{0,63})=(.+)\z/m)
+    return [match[1], match[2]] if match
+
+    [nil, body]
   end
 
   def parse_detected_secret_imports(text, config)
@@ -1065,7 +1083,12 @@ module SessionSecrets
     imported_items = []
 
     imports.each do |raw_import|
-      alias_base, env_base = infer_alias_base(raw_import.context_snippet, masked_prompt)
+      if raw_import.requested_name && !raw_import.requested_name.empty?
+        alias_base = raw_import.requested_name
+        env_base = sanitize_env_name(raw_import.requested_name)
+      else
+        alias_base, env_base = infer_alias_base(raw_import.context_snippet, masked_prompt)
+      end
       alias_name = next_unique_name(alias_base, existing_alias_names)
       env_name = next_unique_name(env_base, existing_env_names)
       target, mutable_config, backend = store_imported_secret(raw_import.body, alias_name, env_name, mutable_config, backend_override)

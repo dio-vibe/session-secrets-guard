@@ -15,6 +15,11 @@ Rules:
 - Prefer existing local environment variables or an approved secret manager.
 - A raw `[[secret]]` placeholder should be treated as an import request, not as
   safe prompt content to forward to the model.
+- A user can name the alias explicitly with the `name=value` body form (the part
+  before the first `=` becomes the alias when it is a valid alias name); the
+  `raw:value` body form forces a raw import without name parsing for secrets that
+  themselves contain `=`. Otherwise the name is inferred from context or token
+  shape.
 - After import, prefer the generated alias such as `[[github_token]]` over
   repeating the raw value.
 - In Codex default `allow_and_scrub` mode, the current turn may continue after
